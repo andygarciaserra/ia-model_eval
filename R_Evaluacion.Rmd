@@ -47,7 +47,7 @@ pre, .r-output, .inline-output {
 En este trabajo aplicaremos los conocimientos aprendidos en evaluación de diferentes tipos de clasificadores de datos en la tarea de predicción de si un indivíduo ha ganado o no una partida de tres en raya, utilizando como datos de input la distribución del tablero de la partida. Para realizar la práctica hemos utilizado el software RStudio, creando un proyecto del tipo Markdown notebook. Utilizando el paquete *caret* de *R* crearemos cuatro modelos ...
 
 
-<!-- 1. Importado datos -->
+<!-- 1. Importando datos -->
 ---
 <h1 style="font-size: 24px; font-family: Arial, sans-serif; color: #2c3e50;">
     <strong>1.Importar Datos</strong>
@@ -73,7 +73,7 @@ any(!tictac[, 10] %in% values[4:5])
 
 ```
 <!-- 2. Data Splitting -->
-
+---
 <h1 style="font-size: 24px; font-family: Arial, sans-serif; color: #2c3e50;">
     <strong>2. Data Splitting</strong>
 </h1>
@@ -81,8 +81,11 @@ any(!tictac[, 10] %in% values[4:5])
 Dividimos el dataset en 70 training y 30 test. Comprobamos que efectivamente la proporción es 7/3.
 
 
-```{r}
+```{r, include=FALSE}
 library(caret)
+```
+
+```{r}
 set.seed(100)
 train_pos <- createDataPartition(tictac$win, p = .7, 
                                   list = FALSE, 
@@ -101,20 +104,38 @@ sum(tictac_test[,10]=="positive")/sum(tictac_test[,10]=="negative")
 ```
 
 <!-- 3. Generación de modelos -->
+---
 <h1 style="font-size: 24px; font-family: Arial, sans-serif; color: #2c3e50;">
     <strong>3. Generación de Modelos</strong>
 </h1>
 
-```{r}
+```{r, include=FALSE}
 library(caret)
 library(klaR)
-set.seed(100)
-#Naive Bayes - nb
-nb_fit <- train(win ~ ., data = tictac_train, method = "nb")
-#Decision Tree - dt
-#Neural Network - nn
-#Nearest Neighbour - knn
-#SVM (linear kernel) - svm
+library(dplyr)
+```
 
+```{r, results='hide'}
+set.seed(100)
+models <- list(
+  NaiveBayes = train(win ~ ., data = tictac_train, method = "nb"),        #Naive Bayes - nb
+  #DecisionTree = train(win ~ ., data = tictac_train, method = "dt"),     #Decision Tree - dt
+  NeuralNetwork = train(win ~ ., data = tictac_train, method = "nnet"),   #Neural Network - nn
+  NearestNeighbour = train(win ~ ., data = tictac_train, method = "knn"), #Nearest Neighbour - knn
+  SVM = train(win ~ ., data = tictac_train, method = "svmLinear")         #SVM (linear kernel) - svm
+)
+
+results <- bind_rows(lapply(models, function(model) {
+  data.frame(
+    Model = model$modelInfo$label,
+    Accuracy = max(model$results$Accuracy),  # Mejor accuracy
+    Kappa = max(model$results$Kappa)         # Mejor kappa
+  )
+}))
+
+```
+
+```{r}
+print(results)
 ```
 

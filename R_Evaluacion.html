@@ -386,7 +386,7 @@ creando un proyecto del tipo Markdown notebook. Utilizando el paquete
 <em>caret</em> de <em>R</em> crearemos cuatro modelos …</p>
 </div>
 <div id="section-2" class="section level2">
-<h2><!-- 1. Importado datos --></h2>
+<h2><!-- 1. Importando datos --></h2>
 <h1 style="font-size: 24px; font-family: Arial, sans-serif; color: #2c3e50;">
 <strong>1.Importar Datos</strong>
 </h1>
@@ -419,15 +419,14 @@ any(!tictac[, 10] %in% values[4:5])</code></pre>
 <pre><code>## [1] FALSE
 ## [1] FALSE
 ## [1] FALSE</code></pre>
-<!-- 2. Data Splitting -->
+</div>
+<div id="section-3" class="section level2">
+<h2><!-- 2. Data Splitting --></h2>
 <h1 style="font-size: 24px; font-family: Arial, sans-serif; color: #2c3e50;">
 <strong>2. Data Splitting</strong>
 </h1>
 <p>Dividimos el dataset en 70 training y 30 test. Comprobamos que
 efectivamente la proporción es 7/3.</p>
-<pre class="r"><code>library(caret)</code></pre>
-<pre><code>## Loading required package: ggplot2</code></pre>
-<pre><code>## Loading required package: lattice</code></pre>
 <pre class="r"><code>set.seed(100)
 train_pos &lt;- createDataPartition(tictac$win, p = .7, 
                                   list = FALSE, 
@@ -445,43 +444,34 @@ sum(tictac_test[,10]==&quot;positive&quot;)/sum(tictac_test[,10]==&quot;negative
 ## [1] 1.88253
 ## [1] 1.879828
 ## [1] 1.888889</code></pre>
-<!-- 3. Generación de modelos -->
+</div>
+<div id="section-4" class="section level2">
+<h2><!-- 3. Generación de modelos --></h2>
 <h1 style="font-size: 24px; font-family: Arial, sans-serif; color: #2c3e50;">
 <strong>3. Generación de Modelos</strong>
 </h1>
-<pre class="r"><code>library(caret)
-library(klaR)</code></pre>
-<pre><code>## Loading required package: MASS</code></pre>
 <pre class="r"><code>set.seed(100)
-#Naive Bayes - nb
-nb_fit &lt;- train(win ~ ., data = tictac_train, method = &quot;nb&quot;)
+models &lt;- list(
+  NaiveBayes = train(win ~ ., data = tictac_train, method = &quot;nb&quot;),        #Naive Bayes - nb
+  #DecisionTree = train(win ~ ., data = tictac_train, method = &quot;dt&quot;),     #Decision Tree - dt
+  NeuralNetwork = train(win ~ ., data = tictac_train, method = &quot;nnet&quot;),   #Neural Network - nn
+  NearestNeighbour = train(win ~ ., data = tictac_train, method = &quot;knn&quot;), #Nearest Neighbour - knn
+  SVM = train(win ~ ., data = tictac_train, method = &quot;svmLinear&quot;)         #SVM (linear kernel) - svm
+)
 
-print(nb_fit)
-#Decision Tree - dt
-#Neural Network - nn
-#Nearest Neighbour - knn
-#SVM (linear kernel) - svm</code></pre>
-<pre><code>## Naive Bayes 
-## 
-## 671 samples
-##   9 predictor
-##   2 classes: &#39;negative&#39;, &#39;positive&#39; 
-## 
-## No pre-processing
-## Resampling: Bootstrapped (25 reps) 
-## Summary of sample sizes: 671, 671, 671, 671, 671, 671, ... 
-## Resampling results across tuning parameters:
-## 
-##   usekernel  Accuracy   Kappa    
-##   FALSE      0.6905892  0.3085060
-##    TRUE      0.6966337  0.1438475
-## 
-## Tuning parameter &#39;fL&#39; was held constant at a value of 0
-## Tuning
-##  parameter &#39;adjust&#39; was held constant at a value of 1
-## Accuracy was used to select the optimal model using the largest value.
-## The final values used for the model were fL = 0, usekernel = TRUE and adjust
-##  = 1.</code></pre>
+results &lt;- bind_rows(lapply(models, function(model) {
+  data.frame(
+    Model = model$modelInfo$label,
+    Accuracy = max(model$results$Accuracy),  # Mejor accuracy
+    Kappa = max(model$results$Kappa)         # Mejor kappa
+  )
+}))</code></pre>
+<pre class="r"><code>print(results)</code></pre>
+<pre><code>##                                        Model  Accuracy     Kappa
+## 1                                Naive Bayes 0.6966337 0.3085060
+## 2                             Neural Network 0.9811234 0.9578909
+## 3                        k-Nearest Neighbors 0.8921976 0.7567237
+## 4 Support Vector Machines with Linear Kernel 0.9812343 0.9576382</code></pre>
 </div>
 
 
