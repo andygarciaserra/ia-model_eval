@@ -111,8 +111,6 @@ library(klaR)
 set.seed(100)
 #Naive Bayes - nb
 nb_fit <- train(win ~ ., data = tictac_train, method = "nb")
-
-print(nb_fit)
 #Decision Tree - dt
 #Neural Network - nn
 #Nearest Neighbour - knn
