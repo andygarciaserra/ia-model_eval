@@ -428,7 +428,7 @@ efectivamente la proporción es 7/3.</p>
 <pre class="r"><code>library(caret)</code></pre>
 <pre><code>## Loading required package: ggplot2</code></pre>
 <pre><code>## Loading required package: lattice</code></pre>
-<pre class="r"><code>set.seed(1000)
+<pre class="r"><code>set.seed(100)
 train_pos &lt;- createDataPartition(tictac$win, p = .7, 
                                   list = FALSE, 
                                   times = 1)
@@ -449,6 +449,39 @@ sum(tictac_test[,10]==&quot;positive&quot;)/sum(tictac_test[,10]==&quot;negative
 <h1 style="font-size: 24px; font-family: Arial, sans-serif; color: #2c3e50;">
 <strong>3. Generación de Modelos</strong>
 </h1>
+<pre class="r"><code>library(caret)
+library(klaR)</code></pre>
+<pre><code>## Loading required package: MASS</code></pre>
+<pre class="r"><code>set.seed(100)
+#Naive Bayes - nb
+nb_fit &lt;- train(win ~ ., data = tictac_train, method = &quot;nb&quot;)
+
+print(nb_fit)
+#Decision Tree - dt
+#Neural Network - nn
+#Nearest Neighbour - knn
+#SVM (linear kernel) - svm</code></pre>
+<pre><code>## Naive Bayes 
+## 
+## 671 samples
+##   9 predictor
+##   2 classes: &#39;negative&#39;, &#39;positive&#39; 
+## 
+## No pre-processing
+## Resampling: Bootstrapped (25 reps) 
+## Summary of sample sizes: 671, 671, 671, 671, 671, 671, ... 
+## Resampling results across tuning parameters:
+## 
+##   usekernel  Accuracy   Kappa    
+##   FALSE      0.6905892  0.3085060
+##    TRUE      0.6966337  0.1438475
+## 
+## Tuning parameter &#39;fL&#39; was held constant at a value of 0
+## Tuning
+##  parameter &#39;adjust&#39; was held constant at a value of 1
+## Accuracy was used to select the optimal model using the largest value.
+## The final values used for the model were fL = 0, usekernel = TRUE and adjust
+##  = 1.</code></pre>
 </div>
 
 
