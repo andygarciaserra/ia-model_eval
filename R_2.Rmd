@@ -1,0 +1,400 @@
+---
+output:
+  html_document:
+    keep_md: true
+    theme: united
+    df_print: paged
+  pdf_document: default
+  css: styles.css
+---
+<!-- CONFIGURACION INICIAL -->
+---
+```{css, echo=FALSE}
+body {
+  margin-left: 50px;
+  margin-right: 50px;
+}
+```
+
+```{r setup, include=FALSE}
+# Global chunk options for all code cells
+knitr::opts_chunk$set(
+  root.dir = "/home/andy/Git/ia-model_eval/",
+  results = 'hold'
+)
+library(caret)
+library(klaR)
+library(dplyr)
+library(knitr)
+library(kableExtra)
+library(AUC)
+library(kernlab)
+library(e1071)
+library(pROC)
+library(ROCR)
+library(plyr)
+library(C50)
+library(htmltools)
+```
+
+<!-- Custom Header -->
+---
+<div style="margin-top: 50px;"></div>
+
+<h1 style="text-align: center; font-size: 36px; font-family: Arial, sans-serif; color: #2c3e50;">
+    <strong>Entrega B: R - Evaluación de Modelos</strong>
+</h1>
+<p style="text-align: center; font-size: 18px; font-family: Arial;">
+    <strong>Andrés García-Serra Romero</strong> <br>
+    <strong>Ciencia de Datos</strong>
+</p>
+
+<!-- 0. Introduccion -->
+---
+<div style="margin-top: 20px;"></div>
+<h1 style="font-size: 24px; font-family: Arial, sans-serif; color: #2c3e50;">
+    <strong> Introducción</strong>
+</h1>
+
+En este trabajo aplicaremos los conocimientos aprendidos en evaluación de diferentes tipos de clasificadores de datos en la tarea de predicción de si un indivíduo ha ganado o no una partida de tres en raya, utilizando como datos de input la distribución del tablero de la partida. Para realizar la práctica hemos utilizado el software RStudio, creando un proyecto del tipo Markdown notebook. Utilizando el paquete *caret* de *R* entrenaremos cuatro modelos: Un Naive Bayes, un modelo de Árboles de Decisión, una Red Neuronal, uno de Nearest Neighbours y finalmente un SVM con kernel lineal. Estos modelos serán entenados todos usando Cross-Validation y los mismos sets de entrenamiento y evaluación, divididiendo el set total de datos al 70/30 respectivamente.
+
+Explicaremos en primer lugar cómo hemos llevado a cabo la división del set global de datos manteniendo la proporción de clases y comprobando que todos los datos sean correctos. Seguidamente entrenaremos los modelos, mostrando las métricas de entrenamiento de cada modelo. Finalmente evaluaremos los modelos usando el set de evaulación y calcularemos distintas métricas (incluyendo el AUC) para comprobar la validez de cada uno de los clasificadores según sus curvas ROC.
+
+
+<!-- 1. Importando datos -->
+---
+<h1 style="font-size: 24px; font-family: Arial, sans-serif; color: #2c3e50;">
+    <strong>1. Importar Datos</strong>
+</h1>
+
+En primer lugar importaremos el fichero *tic-tac-toe.txt* con los datos en un dataframe, del que cambiaremos los nombres de las columnas para comprender mejor los datos. Para esto tendremos en cuenta de que se trata de un tablero 3x3 en el que las posiciones van desde arriba a la izquierda (*pos1*) hasta debajo a la derecha (*pos9*). Llamaremos *win* al último elemento de cada fila, que recoge la victoria o derrota del jugador "x". Aquí podemos ver un ejemplo para entender mejor la distribución de los datos, siendo un ejemplo aleatorio, no real.
+
+```{r, echo=FALSE}
+set.seed(100)
+board <- sample(c('X', 'O'), 9, replace = TRUE)
+
+# 1. Generar una cuadrícula aleatoria con 'x' y 'o'
+html_board <- "<table style='border-collapse: collapse; text-align: center; transform: scale(0.8);'>"
+for (i in 1:3) {
+  html_board <- paste0(html_board, "<tr>")
+  for (j in 1:3) {
+    html_board <- paste0(html_board, sprintf(
+      "<td style='border: 1px solid black; width: 50px; height: 50px; font-size: 30px;'>%s</td>",
+      board[(i-1)*3 + j]
+    ))
+  }
+  html_board <- paste0(html_board, "</tr>")
+}
+html_board <- paste0(html_board, "</table>")
+
+# 2. Representar las posiciones de las variables
+pos_labels <- matrix(paste0("pos", 1:9), nrow = 3, byrow = TRUE)
+html_pos <- "<table style='border-collapse: collapse; text-align: center; transform: scale(0.8);'>"
+for (i in 1:3) {
+  html_pos <- paste0(html_pos, "<tr>")
+  for (j in 1:3) {
+    html_pos <- paste0(html_pos, sprintf(
+      "<td style='border: 1px solid black; width: 50px; height: 50px;'>%s</td>",
+      pos_labels[i, j]
+    ))
+  }
+  html_pos <- paste0(html_pos, "</tr>")
+}
+html_pos <- paste0(html_pos, "</table>")
+
+# 3. Tabla de datos de entrenamiento
+data <- data.frame(
+  pos1 = sample(c('X', 'O'), 5, replace = TRUE),
+  pos2 = sample(c('X', 'O'), 5, replace = TRUE),
+  pos3 = sample(c('X', 'O'), 5, replace = TRUE),
+  pos4 = sample(c('X', 'O'), 5, replace = TRUE),
+  pos5 = sample(c('X', 'O'), 5, replace = TRUE),
+  pos6 = sample(c('X', 'O'), 5, replace = TRUE),
+  pos7 = sample(c('X', 'O'), 5, replace = TRUE),
+  pos8 = sample(c('X', 'O'), 5, replace = TRUE),
+  pos9 = sample(c('X', 'O'), 5, replace = TRUE),
+  result = sample(c('positive', 'negative'), 5, replace = TRUE)
+)
+
+html_data <- "<table style='border-collapse: collapse; text-align: center; border: 1px solid black; transform: scale(0.8);'>"
+html_data <- paste0(html_data, "<tr>", paste0("<th style='border: 1px solid black; padding: 10px;'>", names(data), "</th>", collapse = ""), "</tr>")
+for (i in 1:nrow(data)) {
+  html_data <- paste0(html_data, "<tr>", paste0("<td style='border: 1px solid black; padding: 10px;'>", data[i, ], "</td>", collapse = ""), "</tr>")
+}
+html_data <- paste0(html_data, "<tr>", paste0("<td style='border: 1px solid black; padding: 10px;' colspan='10'>...</td>"), "</tr>")
+html_data <- paste0(html_data, "</table>")
+
+# Imprimir HTML en la misma fila centrado verticalmente con espacio antes y después
+HTML(paste0("<div style='margin: 40px 0; display: flex; align-items: center; justify-content: space-around;'>", 
+            "<div>", html_board, "</div>",
+            "<div>", html_pos, "</div>",
+            "<div>", html_data, "</div>",
+            "</div>"))
+```
+Para el caso real, podemos generar una tabla que recoge las primeras 6 filas de nuestro dataframe ya modificado.
+
+```{r}
+tictac <- data.frame(read.csv("tic-tac-toe.txt"))
+header <- c("pos1","pos2","pos3","pos4","pos5","pos6","pos7","pos8","pos9","win")
+colnames(tictac) <- header
+head(tictac)
+```
+
+<div style="margin-top: 20px;"></div>
+Como último paso dentro del input de datos, analizamos en busca de valores vacíos, NaNs o valores que no sean los deseados, es decir: "x", "o" o "b" entre los componentes de posición y "positive" o "negative" en el último elemento de cada fila.
+
+```{r}
+any(is.na(tictac))
+values <- c("x", "o", "b","positive", "negative")
+any(!as.matrix(tictac[, 1:9]) %in% values[1:3])
+any(!tictac[, 10] %in% values[4:5])
+```
+
+<div style="margin-top: 20px;"></div>
+Podemos ver que el output de estas tres comprobaciones nos da un valor booleano "FALSE", indicando que no existen valores NaN, vacíos o diferentes a los esperados.
+
+<!-- 2. Data Splitting -->
+---
+<div style="margin-top: 20px;"></div>
+<h1 style="font-size: 24px; font-family: Arial, sans-serif; color: #2c3e50;">
+    <strong>2. Data Splitting</strong>
+</h1>
+
+Usando el paquete *caret*, dividimos el dataset en 70% training y 30% test.
+
+```{r}
+set.seed(100)
+train_pos <- createDataPartition(tictac$win, p = .7, 
+                                  list = FALSE, 
+                                  times = 1)
+tictac_train <- tictac[ train_pos,]
+tictac_test  <- tictac[-train_pos,]
+```
+
+<div style="margin-top: 20px;"></div>
+Además, comprobamos dos cosas, la primera es que realmente se hayan dividido correctamente y el cociente entre la cantidad de datos para entrenamiento y validación sea igual o muy cercano a 7/3. La segunda es que la proporción de clases ("positive" y "negative") para los nuevos sets de datos sigan el mismo ratio que en el dataset original.
+
+```{r}
+# Ratio entre el Set de Entrenamiento y el de Evaluación respecto a 7/3
+test_train_ratio <- data.frame(
+  Name = c("Sets Size Ratio to 7/3"),
+  value = dim(tictac_train)[1]/dim(tictac_test)[1] / (7/3)
+)
+kable(test_train_ratio, format = "html") %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+
+# Ratios de Positivos/Negativos para cada set
+sets <- data.frame(
+  Set = c("Pos/Neg Ratio"),
+  Full_Dataset = c(sum(tictac[,10]=="positive")/sum(tictac[,10]=="negative")),
+  Training_Set = c(sum(tictac_train[,10]=="positive")/sum(tictac_train[,10]=="negative")),
+  Validation_Set = c(sum(tictac_test[,10]=="positive")/sum(tictac_test[,10]=="negative"))
+)
+kable(sets, col.names = c("", "Full Dataset", "Training Set", "Validation Set"), format = "html") %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+
+```
+
+<div style="margin-top: 20px;"></div>
+Como podemos ver, tanto la proporción de datos entre los datasets como el ratio de clases cumplen nuestras espectativas, siendo esta segunda comprobación casi idéntica para los tres datasets, el global y los dos nuevos de entrenamiento y validación.
+
+<!-- 3. Generación de modelos -->
+---
+<div style="margin-top: 20px;"></div>
+<h1 style="font-size: 24px; font-family: Arial, sans-serif; color: #2c3e50;">
+    <strong>3. Generación de Modelos</strong>
+</h1>
+
+Utilizando nuestro nuevo dataset de entrenamiento podemos generar los 5 modelos deseados, que tras una búsqueda en la documentación del paquete *
+*caret* serán el *'nb'* (Naive Bayes), *'C5.0'* (Decision Tree), *'nnet'* (Neural Network), *'knn'* (Nearest Neighbour) y por último el *'svmLinear2'* (SVM con kernel lineal). 
+
+Nos aseguramos que los entrenamientos se llevan a cabo utilizando validación cruzada de 10 folds y que nuestros clasificadores ya entrenados también sean evaluados como soft en este mismo proceso de entrenamiento, para más tarde utilizar esta propiedad para poder representar las curvas ROC y hallar la AUC de cada clasificador.
+
+```{r, results='hide', warning=FALSE}
+fitControl <- trainControl(
+  method = "cv",     # validacion cruzada
+  number = 10,       # numero de folds
+  classProbs = TRUE
+)
+
+set.seed(100)
+models <- list(
+  nb_train <- train(win ~ ., data = tictac_train, method = "nb", trControl = fitControl),
+  dt_train <- train(win ~ ., data = tictac_train, method = "C5.0", trControl = fitControl),
+  nn_train <- train(win ~ ., data = tictac_train, method = "nnet", trControl = fitControl),
+  knn_train <- train(win ~ ., data = tictac_train, method = "knn", trControl = fitControl),
+  SVM_train <- train(win ~ ., data = tictac_train, method = "svmLinear2", trControl = fitControl)
+)
+
+results <- bind_rows(lapply(models, function(model) {
+  data.frame(
+    Accuracy = max(model$results$Accuracy),  # Mejor accuracy
+    Kappa = max(model$results$Kappa)         # Mejor kappa
+  )
+}))
+
+Models <- c('Naive Bayes','Decision Tree','Neural Network','Nearest Neighbour','SVM')
+results <- cbind(Models, results)
+```
+<div style="margin-top: 20px;"></div>
+En la siguiente tabla representamos los valores de Accuracy y Kappa del entrenamiento de cada uno de los modelos. Vemos como para el dataset de entrenamiento el modelo que mejores valores de estas métricas da es el Decision Tree, seguido de cerca por el de Red Neuronal y SVM. Estos últimos dos modelos tienen un valor de accuracy idéntico, dando a entender que debido a la simplicidad de los datos y que estamos usando un modelo simple de red neuronal, ambos modelos habrán encontrado una solución muy similar para dividir las dos clases.
+
+Por último queda destacar el mal desempeño del modelo de Naive Bayes, cuyas métricas están muy por debajo del resto de modelos. Esto puede deberse a varias causas, pero la más probable es la correlación de las variables, las cuales el modelo Naive Bayes asume independientes por naturaleza.
+
+```{r, echo=FALSE}
+# Mostrar tabla con estilo en HTML
+kable(results, format = "html") %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+```
+
+<!-- 4. Rendimiento de modelos -->
+---
+<div style="margin-top: 20px;"></div>
+<h1 style="font-size: 24px; font-family: Arial, sans-serif; color: #2c3e50;">
+    <strong>4. Rendimiento de modelos</strong>
+</h1>
+
+Una vez tenemos los modelos correctamente entrenados, podemos aplicarlos a nuestro dataset de validación para ver cuál es su desempeño. Para esto utilizaremos la rutina *predict*. En primer lugar, como ejemplo podemos observar la matriz de confusión del modelo de Red Neuronal, en el que podemos ver que acierta todos los valores negativos, que son menoría, fallando únicamente 3 clases que predice como positivas y son realmente negativas. Este es un muy bien desempeño, como también podemos ver en las diferentes métricas.
+
+```{r}
+nn_pred <- predict(nn_train,tictac_test)
+nn_matrix <- confusionMatrix(nn_pred,factor(tictac_test$win))
+nn_eval <- postResample(nn_pred,factor(tictac_test$win))
+nn_matrix
+```
+
+Podemos mostrar también la matriz de confusión del resto de modelos. Para hacer este proceso más visual nos apoyamos en *gpt-4o* y obtenemos una visual más clara de todas las matrices.
+
+```{r, echo=FALSE}
+library(kableExtra)
+library(htmltools)
+
+# Function to create a styled confusion matrix table
+create_kable_table <- function(conf_matrix, model_name) {
+  # Convert the confusion matrix to a data frame
+  conf_matrix_table <- as.data.frame(conf_matrix$table)
+  colnames(conf_matrix_table) <- c("Actual", "Predicted", "Freq")
+  
+  # Replace column and row names with '+' and '-'
+  conf_matrix_table$Actual <- gsub("positive", "+", conf_matrix_table$Actual)
+  conf_matrix_table$Actual <- gsub("negative", "-", conf_matrix_table$Actual)
+  conf_matrix_table$Predicted <- gsub("positive", "+", conf_matrix_table$Predicted)
+  conf_matrix_table$Predicted <- gsub("negative", "-", conf_matrix_table$Predicted)
+  
+  # Pivot to wide format for better display
+  conf_matrix_table <- tidyr::pivot_wider(conf_matrix_table, names_from = Predicted, values_from = Freq)
+  colnames(conf_matrix_table)[1] <- "Predicted"
+  
+  # Create a nicely styled table with kableExtra
+  conf_matrix_table %>%
+    kbl(caption = paste(model_name), align = "c") %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), 
+                  full_width = FALSE, 
+                  font_size = 12, 
+                  fixed_thead = TRUE) %>%
+    add_header_above(c(" " = 1, "Actual" = ncol(conf_matrix_table) - 1), align = "c") %>%
+    kable_styling(position = "center", full_width = FALSE) %>%
+    row_spec(nrow(conf_matrix_table), extra_css = "border-bottom: 1px solid #ddd;")
+}
+
+# Generate confusion matrices
+nb_pred <- predict(nb_train, tictac_test)
+dt_pred <- predict(dt_train, tictac_test)
+nn_pred <- predict(nn_train, tictac_test)
+knn_pred <- predict(knn_train, tictac_test)
+svm_pred <- predict(SVM_train, tictac_test)
+
+nb_matrix <- confusionMatrix(nb_pred, factor(tictac_test$win))
+dt_matrix <- confusionMatrix(dt_pred, factor(tictac_test$win))
+nn_matrix <- confusionMatrix(nn_pred, factor(tictac_test$win))
+knn_matrix <- confusionMatrix(knn_pred, factor(tictac_test$win))
+svm_matrix <- confusionMatrix(svm_pred, factor(tictac_test$win))
+
+# Store tables in a list
+tables <- list(
+  create_kable_table(nb_matrix, "Naive Bayes"),
+  create_kable_table(dt_matrix, "Decision Tree"),
+  create_kable_table(nn_matrix, "Neural Network"),
+  create_kable_table(knn_matrix, "KNN"),
+  create_kable_table(svm_matrix, "SVM")
+)
+
+# Combine tables into a single HTML grid (one row with 5 columns)
+html_grid <- paste(
+  "<div style='display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px; justify-items: center;'>
+     <style>
+       table { width: 150px; }  /* Make tables wider */
+       caption { font-size: 14px; font-weight: bold; text-align: center; } /* Center titles */
+     </style>",
+  paste(sapply(tables, function(tbl) as.character(tbl)), collapse = ""),
+  "</div>"
+)
+
+# Display the HTML grid
+htmltools::HTML(html_grid)
+
+```
+
+Podemos ver cómo los modelos de Decision Tree Neural Network y SVM funcionan prácticamente idénticos, dejando entre 3 y 4 valores clasificados como positivos pero que realmente eran negativos. Esto pude deberse a 4 outliers que no siguen la tendencia general de los datos, por ello se repiten en los 3 modelos, podrían ser distintas predicciones en cada caso pero se trataría de una coincidencia demasiado oportuna.
+
+También podemos ver cómo el modelo de Naive Bayes predice la gran mayoría de datos (exceptuando 5) en la clase positiva, fallando así todas las clases que realmente eran negativas.
+
+El modelo de Nearest Neighbour sigue la tendencia de estos tres pero con menos porcentaje de aciertos.
+
+Podemos ahora extraer una tabla de accuracy y kappa de cada modelo aplicado a los datos de evaluación y utilizando el 
+
+```{r, echo=FALSE}
+set.seed(100)
+eval <- list(
+  nb_eval <- postResample(predict(nb_train,tictac_test),factor(tictac_test$win)),     #Naive Bayes - nb
+  dt_eval <- postResample(predict(dt_train,tictac_test),factor(tictac_test$win)),     #Decision Tree - dt
+  nn_eval <- postResample(predict(nn_train,tictac_test),factor(tictac_test$win)),     #Neural Network - nn
+  knn_eval <- postResample(predict(knn_train,tictac_test),factor(tictac_test$win)),   #Nearest Neighbour - knn
+  knn_eval <- postResample(predict(SVM_train,tictac_test),factor(tictac_test$win))    #SVM (linear kernel) - svm
+)
+
+eval_results <- bind_rows(lapply(eval, function(model) {
+  data.frame(
+    Accuracy = model[[1]],  # Mejor accuracy
+    Kappa = model[[2]]      # Mejor kappa
+  )
+}))
+
+eval_results <- cbind(eval_results,AUC)
+
+# Mostrar tabla con estilo en HTML
+kable(eval_results, format = "html") %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+
+```
+
+
+
+```{r}
+  set.seed(100)
+  positives <- ifelse(tictac_test$win == "positive", 1, 0)
+  nb_prob <- predict(nb_train,tictac_test, type = "prob")
+  dt_prob <- predict(dt_train,tictac_test, type = "prob")
+  nn_prob <- predict(nn_train,tictac_test, type = "prob")
+  knn_prob <- predict(knn_train,tictac_test, type = "prob")
+  SVM_prob <- predict(SVM_train,tictac_test, type = "prob")
+  
+  nb_pred <- prediction(nb_prob[,2], tictac_test$win)
+  dt_pred <- prediction(dt_prob[,2], tictac_test$win)
+  nn_pred <- prediction(nn_prob[,2], tictac_test$win)
+  knn_pred <- prediction(knn_prob[,2], tictac_test$win)
+  SVM_pred <- prediction(SVM_prob[,2], tictac_test$win)
+  
+  nb_perf <- performance(nb_pred, measure = "tpr", x.measure = "fpr")
+  par(pty = "s")
+  plot(nb_perf, col = "blue", main = "Curvas ROC", xlab = "False Positive Rate (FPR)",
+       ylab = "True positive Rate (TPR)", xlim = c(0, 1), ylim = c(0, 1), asp=1)
+  plot(performance(dt_pred, measure = "tpr", x.measure = "fpr"), col = "red", add = TRUE)
+  plot(performance(nn_pred, measure = "tpr", x.measure = "fpr"), col = "orange", add = TRUE)
+  plot(performance(knn_pred, measure = "tpr", x.measure = "fpr"), col = "green", add = TRUE)
+  plot(performance(SVM_pred, measure = "tpr", x.measure = "fpr"), col = "black", add = TRUE)
+  legend("bottomright", legend = Models, col = c("blue", "red","orange","green","black"), lwd = 2, cex = 0.8)
+
+```
+
+
