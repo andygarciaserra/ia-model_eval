@@ -162,7 +162,7 @@ Podemos ahora tomar los modelos y evaluarlos usando nuestro set de entrenamiento
 
 ```{r}
 nn_pred <- predict(nn_train, tictac_test, type = "prob")
-roc_curve <- roc(nn_pred, factor(tictac_test$win))
+roc_curve <- roc(factor(tictac_test$win,levels = c("negative", "positive")), nn_pred[,2])
 auc_value <- auc(roc_curve)
 print(auc_value)
 ```
@@ -192,17 +192,19 @@ eval_results <- bind_rows(lapply(eval, function(model) {
   )
 }))
 
+eval_results
+
 eval_results <- cbind(Models, eval_results)
 
-AUC <- c(auc(roc(nb_pred,factor(tictac_test$win))),
-         auc(roc(dt_pred,factor(tictac_test$win))),
-         auc(roc(nn_pred,factor(tictac_test$win))),
-         auc(roc(knn_pred,factor(tictac_test$win))),
-         auc(roc(SVM_pred,factor(tictac_test$win)))
+AUC <- c(auc(roc(factor(tictac_test$win, levels = c("negative", "positive")), nb_pred[, 2])),
+         auc(roc(factor(tictac_test$win, levels = c("negative", "positive")), dt_pred[, 2])),
+         auc(roc(factor(tictac_test$win, levels = c("negative", "positive")), nn_pred[, 2])),
+         auc(roc(factor(tictac_test$win, levels = c("negative", "positive")), knn_pred[, 2])),
+         auc(roc(factor(tictac_test$win, levels = c("negative", "positive")), SVM_pred[, 2]))
          )
 
 
-eval_results <- cbind(eval_results,AUC)
+eval_results <- cbind(eval_results, AUC)
 
 kable(eval_results, format = "html") %>%
   kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
@@ -231,7 +233,7 @@ kable(eval_results, format = "html") %>%
   plot(performance(dt_pred, measure = "tpr", x.measure = "fpr"), col = "orange", add = TRUE)
   plot(performance(nn_pred, measure = "tpr", x.measure = "fpr"), col = "green", add = TRUE)
   plot(performance(knn_pred, measure = "tpr", x.measure = "fpr"), col = "black", add = TRUE)
-  #plot(performance(SVM_pred, measure = "tpr", x.measure = "fpr"), col = "pink", add = TRUE)
+  plot(performance(SVM_pred, measure = "tpr", x.measure = "fpr"), col = "pink", add = TRUE)
   #legend("bottomright", legend = c("Naive Bayes", "SVM"), col = c("blue", "red"), lwd = 2)
 
 ```

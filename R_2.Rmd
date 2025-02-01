@@ -1,11 +1,12 @@
 ---
+always_allow_html: true
 output:
   html_document:
     keep_md: true
     theme: united
     df_print: paged
-  pdf_document: default
   css: styles.css
+  pdf_document: default
 ---
 <!-- CONFIGURACION INICIAL -->
 ---
@@ -58,7 +59,7 @@ library(htmltools)
 
 En este trabajo aplicaremos los conocimientos aprendidos en evaluación de diferentes tipos de clasificadores de datos en la tarea de predicción de si un indivíduo ha ganado o no una partida de tres en raya, utilizando como datos de input la distribución del tablero de la partida. Para realizar la práctica hemos utilizado el software RStudio, creando un proyecto del tipo Markdown notebook. Utilizando el paquete *caret* de *R* entrenaremos cuatro modelos: Un Naive Bayes, un modelo de Árboles de Decisión, una Red Neuronal, uno de Nearest Neighbours y finalmente un SVM con kernel lineal. Estos modelos serán entenados todos usando Cross-Validation y los mismos sets de entrenamiento y evaluación, divididiendo el set total de datos al 70/30 respectivamente.
 
-Explicaremos en primer lugar cómo hemos llevado a cabo la división del set global de datos manteniendo la proporción de clases y comprobando que todos los datos sean correctos. Seguidamente entrenaremos los modelos, mostrando las métricas de entrenamiento de cada modelo. Finalmente evaluaremos los modelos usando el set de evaulación y calcularemos distintas métricas (incluyendo el AUC) para comprobar la validez de cada uno de los clasificadores según sus curvas ROC.
+Explicaremos en primer lugar cómo hemos llevado a cabo la división del set global de datos manteniendo la proporción de clases y comprobando que todos los datos sean correctos. Seguidamente entrenaremos los modelos, mostrando las métricas de entrenamiento de cada modelo y evaluaremos los modelos usando el set de evaulación, para lo cual calcularemos distintas métricas (incluyendo el AUC) para comprobar la validez de cada uno de los clasificadores según sus curvas ROC. Finalmente, responderemos las preguntas planteadas en el enunciado de la tarea.
 
 
 <!-- 1. Importando datos -->
@@ -302,13 +303,13 @@ nb_pred <- predict(nb_train, tictac_test)
 dt_pred <- predict(dt_train, tictac_test)
 nn_pred <- predict(nn_train, tictac_test)
 knn_pred <- predict(knn_train, tictac_test)
-svm_pred <- predict(SVM_train, tictac_test)
+SVM_pred <- predict(SVM_train, tictac_test)
 
 nb_matrix <- confusionMatrix(nb_pred, factor(tictac_test$win))
 dt_matrix <- confusionMatrix(dt_pred, factor(tictac_test$win))
 nn_matrix <- confusionMatrix(nn_pred, factor(tictac_test$win))
 knn_matrix <- confusionMatrix(knn_pred, factor(tictac_test$win))
-svm_matrix <- confusionMatrix(svm_pred, factor(tictac_test$win))
+SVM_matrix <- confusionMatrix(SVM_pred, factor(tictac_test$win))
 
 # Store tables in a list
 tables <- list(
@@ -316,7 +317,7 @@ tables <- list(
   create_kable_table(dt_matrix, "Decision Tree"),
   create_kable_table(nn_matrix, "Neural Network"),
   create_kable_table(knn_matrix, "KNN"),
-  create_kable_table(svm_matrix, "SVM")
+  create_kable_table(SVM_matrix, "SVM")
 )
 
 # Combine tables into a single HTML grid (one row with 5 columns)
@@ -335,6 +336,7 @@ htmltools::HTML(html_grid)
 
 ```
 
+
 Podemos ver cómo los modelos de Decision Tree Neural Network y SVM funcionan prácticamente idénticos, dejando entre 3 y 4 valores clasificados como positivos pero que realmente eran negativos. Esto pude deberse a 4 outliers que no siguen la tendencia general de los datos, por ello se repiten en los 3 modelos, podrían ser distintas predicciones en cada caso pero se trataría de una coincidencia demasiado oportuna.
 
 También podemos ver cómo el modelo de Naive Bayes predice la gran mayoría de datos (exceptuando 5) en la clase positiva, fallando así todas las clases que realmente eran negativas.
@@ -345,12 +347,21 @@ Podemos ahora extraer una tabla de accuracy y kappa de cada modelo aplicado a lo
 
 ```{r, echo=FALSE}
 set.seed(100)
+
+
+nb_prob <- predict(nb_train,tictac_test, type = "prob")
+dt_prob <- predict(dt_train,tictac_test, type = "prob")
+nn_prob <- predict(nn_train,tictac_test, type = "prob")
+knn_prob <- predict(knn_train,tictac_test, type = "prob")
+SVM_prob <- predict(SVM_train,tictac_test, type = "prob")
+
+
 eval <- list(
   nb_eval <- postResample(predict(nb_train,tictac_test),factor(tictac_test$win)),     #Naive Bayes - nb
   dt_eval <- postResample(predict(dt_train,tictac_test),factor(tictac_test$win)),     #Decision Tree - dt
   nn_eval <- postResample(predict(nn_train,tictac_test),factor(tictac_test$win)),     #Neural Network - nn
   knn_eval <- postResample(predict(knn_train,tictac_test),factor(tictac_test$win)),   #Nearest Neighbour - knn
-  knn_eval <- postResample(predict(SVM_train,tictac_test),factor(tictac_test$win))    #SVM (linear kernel) - svm
+  SVM_eval <- postResample(predict(SVM_train,tictac_test),factor(tictac_test$win))    #SVM (linear kernel) - svm
 )
 
 eval_results <- bind_rows(lapply(eval, function(model) {
@@ -360,7 +371,15 @@ eval_results <- bind_rows(lapply(eval, function(model) {
   )
 }))
 
-eval_results <- cbind(eval_results,AUC)
+eval_results <- cbind(Models, eval_results)
+
+AUC <- c(auc(roc(factor(tictac_test$win, levels = c("negative", "positive")), nb_prob[,2])),
+         auc(roc(factor(tictac_test$win, levels = c("negative", "positive")), dt_prob[,2])),
+         auc(roc(factor(tictac_test$win, levels = c("negative", "positive")), nn_prob[,2])),
+         auc(roc(factor(tictac_test$win, levels = c("negative", "positive")), knn_prob[,2])),
+         auc(roc(factor(tictac_test$win, levels = c("negative", "positive")), SVM_prob[,2]))
+         )
+eval_results <- cbind(eval_results, AUC)
 
 # Mostrar tabla con estilo en HTML
 kable(eval_results, format = "html") %>%
@@ -369,15 +388,8 @@ kable(eval_results, format = "html") %>%
 ```
 
 
-
 ```{r}
   set.seed(100)
-  positives <- ifelse(tictac_test$win == "positive", 1, 0)
-  nb_prob <- predict(nb_train,tictac_test, type = "prob")
-  dt_prob <- predict(dt_train,tictac_test, type = "prob")
-  nn_prob <- predict(nn_train,tictac_test, type = "prob")
-  knn_prob <- predict(knn_train,tictac_test, type = "prob")
-  SVM_prob <- predict(SVM_train,tictac_test, type = "prob")
   
   nb_pred <- prediction(nb_prob[,2], tictac_test$win)
   dt_pred <- prediction(dt_prob[,2], tictac_test$win)
