@@ -5,18 +5,11 @@ output:
     keep_md: true
     theme: united
     df_print: paged
-  css: styles.css
+    css: styles.css
   pdf_document: default
 ---
-<!-- CONFIGURACION INICIAL -->
+<!-- Importing Libraries -->
 ---
-```{css, echo=FALSE}
-body {
-  margin-left: 50px;
-  margin-right: 50px;
-}
-```
-
 ```{r setup, include=FALSE}
 # Global chunk options for all code cells
 knitr::opts_chunk$set(
@@ -57,9 +50,9 @@ library(htmltools)
     <strong> Introducción</strong>
 </h1>
 
-En este trabajo aplicaremos los conocimientos aprendidos en evaluación de diferentes tipos de clasificadores de datos en la tarea de predicción de si un indivíduo ha ganado o no una partida de tres en raya, utilizando como datos de input la distribución del tablero de la partida. Para realizar la práctica hemos utilizado el software RStudio, creando un proyecto del tipo Markdown notebook. Utilizando el paquete *caret* de *R* entrenaremos cuatro modelos: Un Naive Bayes, un modelo de Árboles de Decisión, una Red Neuronal, uno de Nearest Neighbours y finalmente un SVM con kernel lineal. Estos modelos serán entenados todos usando Cross-Validation y los mismos sets de entrenamiento y evaluación, divididiendo el set total de datos al 70/30 respectivamente.
+En este trabajo aplicaremos los conocimientos aprendidos en evaluación de diferentes tipos de clasificadores de datos en la tarea de predicción de si un indivíduo ha ganado o no una partida de tres en raya, utilizando como datos de input la distribución del tablero de la partida. Para realizar la práctica hemos utilizado el software RStudio, creando un proyecto del tipo Markdown notebook. Utilizando el paquete *caret* de *R* entrenaremos cuatro modelos: Un Naive Bayes, un modelo de Árboles de Decisión, una Red Neuronal, uno de Nearest Neighbours y finalmente un SVM con kernel lineal. Estos modelos serán entrenados todos usando Cross-Validation y los mismos sets de entrenamiento y evaluación, dividiendo el set total de datos al 70/30 respectivamente.
 
-Explicaremos en primer lugar cómo hemos llevado a cabo la división del set global de datos manteniendo la proporción de clases y comprobando que todos los datos sean correctos. Seguidamente entrenaremos los modelos, mostrando las métricas de entrenamiento de cada modelo y evaluaremos los modelos usando el set de evaulación, para lo cual calcularemos distintas métricas (incluyendo el AUC) para comprobar la validez de cada uno de los clasificadores según sus curvas ROC. Finalmente, responderemos las preguntas planteadas en el enunciado de la tarea.
+Explicaremos en primer lugar cómo hemos llevado a cabo la división del set global de datos manteniendo la proporción de clases y comprobando que todos los datos sean correctos. Seguidamente entrenaremos los modelos, mostrando las métricas de entrenamiento de cada modelo y evaluaremos los modelos usando el set de evaluación, para lo cual calcularemos distintas métricas (incluyendo el AUC) para comprobar la validez de cada uno de los clasificadores según sus curvas ROC. Finalmente, responderemos las preguntas planteadas en el enunciado de la tarea.
 
 
 <!-- 1. Importando datos -->
@@ -71,7 +64,7 @@ Explicaremos en primer lugar cómo hemos llevado a cabo la división del set glo
 En primer lugar importaremos el fichero *tic-tac-toe.txt* con los datos en un dataframe, del que cambiaremos los nombres de las columnas para comprender mejor los datos. Para esto tendremos en cuenta de que se trata de un tablero 3x3 en el que las posiciones van desde arriba a la izquierda (*pos1*) hasta debajo a la derecha (*pos9*). Llamaremos *win* al último elemento de cada fila, que recoge la victoria o derrota del jugador "x". Aquí podemos ver un ejemplo para entender mejor la distribución de los datos, siendo un ejemplo aleatorio, no real.
 
 ```{r, echo=FALSE}
-set.seed(100)
+set.seed(123)
 board <- sample(c('X', 'O'), 9, replace = TRUE)
 
 # 1. Generar una cuadrícula aleatoria con 'x' y 'o'
@@ -164,7 +157,7 @@ Podemos ver que el output de estas tres comprobaciones nos da un valor booleano 
 Usando el paquete *caret*, dividimos el dataset en 70% training y 30% test.
 
 ```{r}
-set.seed(100)
+set.seed(123)
 train_pos <- createDataPartition(tictac$win, p = .7, 
                                   list = FALSE, 
                                   times = 1)
@@ -206,7 +199,7 @@ Como podemos ver, tanto la proporción de datos entre los datasets como el ratio
     <strong>3. Generación de Modelos</strong>
 </h1>
 
-Utilizando nuestro nuevo dataset de entrenamiento podemos generar los 5 modelos deseados, que tras una búsqueda en la documentación del paquete *
+Utilizando nuestro nuevo dataset de entrenamiento podemos generar los 5 modelos deseados, que tras una búsqueda en la documentación del paquete
 *caret* serán el *'nb'* (Naive Bayes), *'C5.0'* (Decision Tree), *'nnet'* (Neural Network), *'knn'* (Nearest Neighbour) y por último el *'svmLinear2'* (SVM con kernel lineal). 
 
 Nos aseguramos que los entrenamientos se llevan a cabo utilizando validación cruzada de 10 folds y que nuestros clasificadores ya entrenados también sean evaluados como soft en este mismo proceso de entrenamiento, para más tarde utilizar esta propiedad para poder representar las curvas ROC y hallar la AUC de cada clasificador.
@@ -218,7 +211,7 @@ fitControl <- trainControl(
   classProbs = TRUE
 )
 
-set.seed(100)
+set.seed(123)
 models <- list(
   nb_train <- train(win ~ ., data = tictac_train, method = "nb", trControl = fitControl),
   dt_train <- train(win ~ ., data = tictac_train, method = "C5.0", trControl = fitControl),
@@ -237,10 +230,11 @@ results <- bind_rows(lapply(models, function(model) {
 Models <- c('Naive Bayes','Decision Tree','Neural Network','Nearest Neighbour','SVM')
 results <- cbind(Models, results)
 ```
+
 <div style="margin-top: 20px;"></div>
 En la siguiente tabla representamos los valores de Accuracy y Kappa del entrenamiento de cada uno de los modelos. Vemos como para el dataset de entrenamiento el modelo que mejores valores de estas métricas da es el Decision Tree, seguido de cerca por el de Red Neuronal y SVM. Estos últimos dos modelos tienen un valor de accuracy idéntico, dando a entender que debido a la simplicidad de los datos y que estamos usando un modelo simple de red neuronal, ambos modelos habrán encontrado una solución muy similar para dividir las dos clases.
 
-Por último queda destacar el mal desempeño del modelo de Naive Bayes, cuyas métricas están muy por debajo del resto de modelos. Esto puede deberse a varias causas, pero la más probable es la correlación de las variables, las cuales el modelo Naive Bayes asume independientes por naturaleza.
+Por último queda destacar el mal desempeño del modelo de Naive Bayes, cuyas métricas están muy por debajo del resto de modelos. Esto puede deberse a varias causas, pero la más probable es la correlación de las variables, las cuales el modelo Naive Bayes asume independientes por naturaleza, pero en este ejemplo claramente no lo son.
 
 ```{r, echo=FALSE}
 # Mostrar tabla con estilo en HTML
@@ -255,7 +249,7 @@ kable(results, format = "html") %>%
     <strong>4. Rendimiento de modelos</strong>
 </h1>
 
-Una vez tenemos los modelos correctamente entrenados, podemos aplicarlos a nuestro dataset de validación para ver cuál es su desempeño. Para esto utilizaremos la rutina *predict*. En primer lugar, como ejemplo podemos observar la matriz de confusión del modelo de Red Neuronal, en el que podemos ver que acierta todos los valores negativos, que son menoría, fallando únicamente 3 clases que predice como positivas y son realmente negativas. Este es un muy bien desempeño, como también podemos ver en las diferentes métricas.
+Una vez tenemos los modelos correctamente entrenados, podemos aplicarlos a nuestro dataset de validación para ver cuál es su desempeño. Para esto utilizaremos la rutina *predict*. En primer lugar, como ejemplo podemos observar la matriz de confusión del modelo de Red Neuronal, en el que podemos ver que acierta todos los valores negativos, que son minoría, fallando únicamente 3 clases que predice como positivas y son realmente negativas. Este es un muy bien desempeño, como también podemos ver en las diferentes métricas.
 
 ```{r}
 nn_pred <- predict(nn_train,tictac_test)
@@ -337,16 +331,14 @@ htmltools::HTML(html_grid)
 ```
 
 
-Podemos ver cómo los modelos de Decision Tree Neural Network y SVM funcionan prácticamente idénticos, dejando entre 3 y 4 valores clasificados como positivos pero que realmente eran negativos. Esto pude deberse a 4 outliers que no siguen la tendencia general de los datos, por ello se repiten en los 3 modelos, podrían ser distintas predicciones en cada caso pero se trataría de una coincidencia demasiado oportuna.
+Podemos ver cómo los modelos de Decision Tree Neural Network y SVM funcionan prácticamente idénticos, dejando entre 3 y 4 valores clasificados como positivos pero que realmente eran negativos. Esto pude deberse a 4 outliers que no siguen la tendencia general de los datos, por ello se repiten en los 3 modelos, podrían ser distintas predicciones en cada caso pero se trataría de una coincidencia demasiado oportuna. El modelo de Nearest Neighbour sigue la tendencia de estos tres pero con menos porcentaje de aciertos.
 
 También podemos ver cómo el modelo de Naive Bayes predice la gran mayoría de datos (exceptuando 5) en la clase positiva, fallando así todas las clases que realmente eran negativas.
 
-El modelo de Nearest Neighbour sigue la tendencia de estos tres pero con menos porcentaje de aciertos.
+Podemos ahora extraer una tabla de accuracy y kappa de cada modelo aplicado a los datos de evaluación y utilizando el paquete *AUC* podemos incluir en la tabla también el valor de el área bajo la curva ROC (AUC), que podemos calcular si la predicción de la clasificación de los datos de evaluación la hacemos de tipo probabilístico. Esto genera clasificadores soft que dan dos componentes por fila de datos, ofreciendo la probabilidad en tanto por uno de que cada una de las clases sea elegida como correcta en cada caso. Estos clasificadores soft pueden darse como naturales en algunos modelos que tienen la arquitectura correcta, como el de Red Neuronal o el de Naive Bayes, pero para el resto se calculan probabilidades sintéticas para poder observar el comportamiento de las curvas ROC de cada modelo.
 
-Podemos ahora extraer una tabla de accuracy y kappa de cada modelo aplicado a los datos de evaluación y utilizando el 
-
-```{r, echo=FALSE}
-set.seed(100)
+```{r, message=FALSE}
+set.seed(123)
 
 
 nb_prob <- predict(nb_train,tictac_test, type = "prob")
@@ -373,12 +365,14 @@ eval_results <- bind_rows(lapply(eval, function(model) {
 
 eval_results <- cbind(Models, eval_results)
 
-AUC <- c(auc(roc(factor(tictac_test$win, levels = c("negative", "positive")), nb_prob[,2])),
-         auc(roc(factor(tictac_test$win, levels = c("negative", "positive")), dt_prob[,2])),
-         auc(roc(factor(tictac_test$win, levels = c("negative", "positive")), nn_prob[,2])),
-         auc(roc(factor(tictac_test$win, levels = c("negative", "positive")), knn_prob[,2])),
-         auc(roc(factor(tictac_test$win, levels = c("negative", "positive")), SVM_prob[,2]))
-         )
+AUC <- c(
+  auc(roc(tictac_test$win, nb_prob[,2])),
+  auc(roc(tictac_test$win, dt_prob[,2])),
+  auc(roc(tictac_test$win, nn_prob[,2])),
+  auc(roc(tictac_test$win, knn_prob[,2])),
+  auc(roc(tictac_test$win, SVM_prob[,2]))
+)
+
 eval_results <- cbind(eval_results, AUC)
 
 # Mostrar tabla con estilo en HTML
@@ -387,9 +381,12 @@ kable(eval_results, format = "html") %>%
 
 ```
 
+Vemos como el clasificador que presenta una mejor métrica AUC es el modelo de Árbol de Decisión, presentando un valor muy cercano al clasificador perfecto. Recordemos que esta métrica es importante en el caso de tener que decidir usar un clasificador entre todos cuando no estamos teniendo en cuenta la matriz de costes. En el caso de tener una matriz de costes y hacer un análisis '*cost-sensitive*', tendríamos que fijarnos en la pendiente proveniente de esta matriz de costes y dependería de las diferentes curvas ROC.
 
-```{r}
-  set.seed(100)
+Para poder realizar este análisis de curvas ROC podemos representarlas utilizando el paquete *ROCR*.
+
+```{r,fig.align = "center"}
+  set.seed(123)
   
   nb_pred <- prediction(nb_prob[,2], tictac_test$win)
   dt_pred <- prediction(dt_prob[,2], tictac_test$win)
@@ -409,4 +406,76 @@ kable(eval_results, format = "html") %>%
 
 ```
 
+Podemos ver como la curva ROC del modelo Decision Tree (rojo) muestra un clasificador casi perfecto que servirá muy bien para la mayoría de casos, exceptuando los casos extremos en los que la pendiente proveniente del producto de Hadamard de la matriz de costes tenga valores muy altos o muy pequeños.
 
+Par los casos extremos en los que tengamos una proporción de costes con mucho mayor coste en el falso negativo seguramente el mejor modelo será el de Red Neuronal o SVM con kernel lineal, mientras que para el caso en el que tengamos mucho mayor coste de falsos positivos, es probable que el mejor modelo sea el de Nearest Neighbours.
+
+Es importante por esto considerar el contexto del problema que queremos resolver y entender que la matriz de costes y su análisis es crucial en la toma de decisiones del clasificador a elegir.
+
+<!-- 5. Preguntas -->
+---
+<div style="margin-top: 20px;"></div>
+<h1 style="font-size: 24px; font-family: Arial, sans-serif; color: #2c3e50;">
+    <strong>5. Preguntas</strong>
+</h1>
+
+<div style="margin-top: 10px;"></div>
+<h1 style="font-size: 16px; font-family: Arial, sans-serif; color: #2c3e50;">
+    <strong>Q1. ¿Si el modelo A tiene mayor Accuracy que B, siempre tendrá mayor Kappa que B? Justifica tu respuesta
+</strong>
+</h1>
+
+En un dataset donde la proporción de positivos y negativos es aproximadamente 50%, tendremos que un modelo de accuracy alta generará por lo general también un valor de kappa más alto que un modelo con accuracy baja. Pero en el caso de datasets que presenten una proporción de datos menos equitativa, pueden darse clasificadores que por ejemplo sólo muestren como respuesta una de las clases en la gran mayoría de casos (como es el caso de Naive Bayes en nuestro estudio), dando lugar a una alta Accuracy si la clase clasificada es la dominante en los datos, pero dando lugar a un valor de kappa inferior, puesto que el modelo se muestra similar a un clasificador aleatorio. En este caso un modelo que clasifique los datos de forma más coherente a un caso genérico, es decir, un modelo más robusto, tendrá un valor de accuracy menor, pero mostrará un valor de Kappa mayor al anterior, puesto que distará más de un clasificador aleatorio.
+
+<div style="margin-top: 10px;"></div>
+<h1 style="font-size: 16px; font-family: Arial, sans-serif; color: #2c3e50;">
+    <strong>Q2. ¿Vemos eso en tus resultados?
+</strong>
+</h1>
+
+En nuestro caso podemos ver como tenemos unos datos con tendencia hacia la clase positiva:
+
+```{r}
+prop <- sum(tictac[,10]=="positive")/(sum(tictac[,10]=="positive")+sum(tictac[,10]=="negative"))
+print(prop)
+```
+
+Teniendo un 65% de casos positivos aproximadamente. En este contexto vemos como el modelo Naive Bayes hace predicciones cercanas al 0.5 de accuracy de un clasificador aleatorio, pero los datos no tienen una proporción tan alta de positivos para que esto sea relevante en el valor de accuracy. Sin embargo podemos ver cómo el valor de accuracy se aproxima mucho a la proporción de positivos, mostrando lo que confirmamos en la matriz de confusión, este modelo predice todos los valores positivos, exceptuando 5 casos.
+
+Si nuestros datos tuvieran una proporción de positivos mucho mayor podría darse el caso en el que el modelo Naive Bayes teniendo un mayor valor de accuracy tendría un valor de kappa muy inferior a modelos con menor accuracy.
+
+<div style="margin-top: 10px;"></div>
+<h1 style="font-size: 16px; font-family: Arial, sans-serif; color: #2c3e50;">
+    <strong>Q3. ¿Te cambian los resultados cuando cambias la semilla?
+</strong>
+</h1>
+
+Sí, los resultados cambian al variar la semilla. Esto puede deberse a la poca cantidad de datos, que hace que los subsets de cross-validation puedan tener cierto impacto en el entrenamiento de datos, pese a mantener constante la proporción de positivos y negativos.
+
+<div style="margin-top: 10px;"></div>
+<h1 style="font-size: 16px; font-family: Arial, sans-serif; color: #2c3e50;">
+    <strong>Q4. ¿Es recomendable quedarse con los resultados mejores después de cambiar las semillas varias veces? Justifica la respuesta.
+</strong>
+</h1>
+
+Es positivo cambiar el valor del seed para ver como de robusto es nuestro análisis de comparación entre los distintos modelos y como de dependiente es al entrenamiento de estos. SIn embargo, elegir a dedo el mejor seed para representar los resultados que buscamos no es un método que nos dé ningún resultado si lo que buscamos es justamente analizar el desempeño de cada modelo. La respuesta a si es recomendable es un rotundo no.
+
+<div style="margin-top: 10px;"></div>
+<h1 style="font-size: 16px; font-family: Arial, sans-serif; color: #2c3e50;">
+    <strong>Q5. ¿Qué modelos puedes descartar porque van a ser siempre subóptimos (asumiendo una buena evaluación)?
+</strong>
+</h1>
+
+Entendiendo como buena evaluación la que tiene suficientes datos de entrenamiento y evaluación para poder realizar afirmaciones sobre la validez de un modelo. Seguramente centraría el análisis de validez de un modelo en revisar las diferentes métricas, poniendo incapié en la matriz de confusión y teniendo siempre en cuenta la variabilidad de mis datos. También valoraría la curva ROC del modelo y el valor de AUC como las métricas más importantes y en el caso de tener una matriz de costes para la aplicación de mi modelo vería cómo desempeña mi modelo para esa matriz de costes concreta, descartandolo por completo si sus errores suponen un coste muy alto.
+
+En nuestro caso concreto, se trata de un ejemplo sencillo con datos simples y con poca variabilidad pero podemos ver claramente como el modelo de Naive Bayes es descartable debido a su modo de predecir siempre la misma clase. Esto tiene un impacto en la matriz de confusión y su curva AUC que se asemeja a la recta que representaría un clasificador aleatorio en una figura FPR-TPR.
+
+<div style="margin-top: 10px;"></div>
+<h1 style="font-size: 16px; font-family: Arial, sans-serif; color: #2c3e50;">
+    <strong>Q6. ¿Por qué puedes descartar esos modelos?
+</strong>
+</h1>
+
+Cabe destacar que el descarte de ciertos modelos es siempre debido a la comparación con otros, es decir, si tenemos más modelos para comparar que claramente presentan mejores métricas y sobretodo, mejores curvas ROC para cualquier contexto posible dentro de nuestros datos, los modelos considerados subóptimos serán descartados porque ya hay otros que funcionan mejor de forma genérica. (Entendiendo contexto como matriz de costes y el producto de Hadamard de esta)
+
+<div style="margin-top: 30px;"></div>
